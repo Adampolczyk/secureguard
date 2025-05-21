@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Compromised</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+  <style>
+    /* Custom styles for a terminal-like appearance */
+    body {
+      font-family: 'Inter', monospace;
+      /* Use Inter or a monospace font */
+      background-color: #0d1117;
+      /* Dark background */
+      color: #00ff00;
+      /* Green text for terminal feel */
+      overflow: hidden;
+      /* Prevent scrolling */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      cursor: none;
+      /* Hide default cursor */
+      position: relative;
+      /* Needed for absolute positioning of overlays */
+    }
+
+    /* Screen shake effect */
+    .screen-shake {
+      animation: shake 0.2s cubic-bezier(.36, .07, .19, .97) both;
+      transform: translate3d(0, 0, 0);
+      backface-visibility: hidden;
+      perspective: 1000px;
+    }
+
+    @keyframes shake {
+
+      10%,
+      90% {
+        transform: translate3d(-1px, 0, 0);
+      }
+
+      20%,
+      80% {
+        transform: translate3d(2px, 0, 0);
+      }
+
+      30%,
+      70% {
+        transform: translate3d(-4px, 0, 0);
+      }
+
+      40%,
+      60% {
+        transform: translate3d(4px, 0, 0);
+      }
+
+      50% {
+        transform: translate3d(-4px, 0, 0);
+      }
+    }
+
+    /* Full-screen red flash effect */
+    .red-flash-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(255, 0, 0, 0.5);
+      /* Semi-transparent red */
+      z-index: 10000;
+      /* On top of everything */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s ease-out;
+    }
+
+    .red-flash-overlay.active {
+      opacity: 1;
+    }
+
+    /* Glitch effect for body */
+    .glitch-effect {
+      animation: glitch 0.1s infinite alternate;
+    }
+
+    @keyframes glitch {
+      0% {
+        filter: hue-rotate(0deg);
+        transform: translate(0);
+      }
+
+      20% {
+        filter: hue-rotate(10deg) contrast(1.2);
+        transform: translate(-2px, 2px);
+      }
+
+      40% {
+        filter: hue-rotate(20deg) brightness(0.8);
+        transform: translate(2px, -2px);
+      }
+
+      60% {
+        filter: hue-rotate(30deg) saturate(1.5);
+        transform: translate(-3px, 3px);
+      }
+
+      80% {
+        filter: hue-rotate(40deg) invert(0.1);
+        transform: translate(3px, -3px);
+      }
+
+      100% {
+        filter: hue-rotate(50deg);
+        transform: translate(0);
+      }
+    }
+
+
+    /* Styling for the simulated command line output */
+    .terminal-output {
+      max-width: 90vw;
+      width: 800px;
+      padding: 2rem;
+      background-color: rgba(0, 0, 0, 0.7);
+      /* Slightly transparent background */
+      border-radius: 0.5rem;
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+      /* Green glow effect */
+      white-space: pre-wrap;
+      /* Preserve whitespace and wrap text */
+      font-size: 1rem;
+      line-height: 1.5;
+      overflow-y: auto;
+      /* Enable scrolling for long output */
+      height: 70vh;
+      /* Limit height */
+      opacity: 0;
+      /* Hidden initially */
+      transition: opacity 1s ease-in-out;
+      z-index: 10;
+      /* Ensure it's above other elements but below popup */
+      position: relative;
+      /* Needed for button positioning */
+      display: flex;
+      flex-direction: column;
+      /* Arrange content vertically */
+      justify-content: space-between;
+      /* Push button to bottom */
+    }
+
+    .terminal-output.active {
+      opacity: 1;
+    }
+
+    /* Cursor blinking effect */
+    .cursor {
+      display: inline-block;
+      width: 0.75rem;
+      height: 1rem;
+      background-color: #00ff00;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+
+      from,
+      to {
+        background-color: transparent;
+      }
+
+      50% {
+        background-color: #00ff00;
+      }
+    }
+
+    /* Popup overlay styles */
+    .popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.95);
+      /* Darker, more opaque overlay */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      transition: opacity 0.5s ease-out;
+    }
+
+    .popup-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+      /* Allow clicks through once hidden */
+    }
+
+    .popup-content {
+      background-color: #1a202c;
+      /* Dark background for popup */
+      padding: 2.5rem;
+      /* Slightly more padding */
+      border-radius: 0.75rem;
+      box-shadow: 0 0 40px rgba(255, 0, 0, 0.9);
+      /* More intense red glow for warning */
+      text-align: center;
+      color: #ffffff;
+      max-width: 90%;
+      border: 2px solid #ff0000;
+      /* Red border */
+    }
+
+    .popup-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.5rem;
+      margin-bottom: 1.5rem;
+      /* More space */
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.7);
+      /* Stronger image glow */
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      background-color: #2d3748;
+      border-radius: 0.25rem;
+      height: 0.75rem;
+      margin-top: 1rem;
+      overflow: hidden;
+      display: none;
+      /* Hidden initially */
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #ff0000;
+      /* Red progress bar for urgency */
+      border-radius: 0.25rem;
+      transition: width 0.5s ease-out;
+    }
+
+    /* Dynamic warning styles */
+    .dynamic-warning {
+      position: fixed;
+      color: #ff0000;
+      /* Red text for warnings */
+      font-size: 2.5rem;
+      /* Large font size */
+      font-weight: bold;
+      text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+      z-index: 100;
+      /* Above terminal, below main popup */
+      animation: pulse-red 0.5s infinite alternate;
+      /* Flashing effect */
+      pointer-events: none;
+      /* Allow clicks through */
+      opacity: 0;
+      /* Hidden initially */
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    .dynamic-warning.show {
+      opacity: 1;
+    }
+
+    @keyframes pulse-red {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0.5;
+      }
+    }
+
+    /* LLM generated message popup */
+    .llm-message-popup {
+      position: fixed;
+      background-color: rgba(25, 25, 25, 0.95);
+      /* Darker background */
+      color: #ff0000;
+      /* Red text for intercepted message */
+      border: 2px solid #ff0000;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      max-width: 400px;
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: bold;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.7);
+      z-index: 5000;
+      /* High z-index */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+      transform: scale(0.8);
+      /* Start smaller */
+    }
+
+    .llm-message-popup.active {
+      opacity: 1;
+      transform: scale(1);
+      /* Scale to normal size */
+    }
+
+    /* New button styling for "Get Back Data" */
+    #getBackDataButton {
+      margin-top: auto;
+      /* Push button to the bottom */
+      opacity: 0;
+      /* Hidden initially */
+      transition: opacity 0.5s ease-in-out;
+      align-self: center;
+      /* Center the button horizontally */
+    }
+
+    #getBackDataButton.active {
+      opacity: 1;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .terminal-output {
+        padding: 1rem;
+        font-size: 0.875rem;
+        height: 80vh;
+      }
+
+      .popup-content {
+        padding: 1.5rem;
+      }
+
+      .dynamic-warning {
+        font-size: 1.5rem;
+        /* Smaller font on mobile */
+      }
+
+      .llm-message-popup {
+        max-width: 90%;
+        font-size: 0.9rem;
+      }
+
+      #getBackDataButton {
+        font-size: 1.2rem;
+        padding: 0.75rem 1.5rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="popupOverlay" class="popup-overlay">
+    <div class="popup-content">
+      <img src="https://placehold.co/600x400/CC0000/FFFFFF?text=CRITICAL+SYSTEM+FAILURE" alt="Critical System Failure"
+        onerror="this.onerror=null;this.src='https://placehold.co/600x400/CC0000/FFFFFF?text=ERROR';">
+      <h2 class="text-3xl font-bold mb-3 text-red-600 animate-pulse">SYSTEM BREACH DETECTED!</h2>
+      <p class="text-xl text-gray-200">Your system integrity has been compromised.</p>
+      <p class="text-lg text-gray-300 mt-4 mb-6">Click the button below to acknowledge the breach and proceed.</p>
+      <button id="startButton"
+        class="px-8 py-4 bg-red-700 hover:bg-red-800 text-white font-bold text-2xl rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-75">
+        CLICK HERE
+      </button>
+    </div>
+  </div>
+
+  <div id="redFlashOverlay" class="red-flash-overlay"></div>
+
+  <div id="terminalOutput" class="terminal-output">
+    <span id="outputContent"></span><span class="cursor" id="cursor"></span>
+    <div id="progressBarContainer" class="progress-bar-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+    <button id="getBackDataButton"
+      class="px-8 py-4 bg-green-700 hover:bg-green-800 text-white font-bold text-2xl rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-75 mt-8">
+      <a href="https://youtu.be/dQw4w9WgXcQ?"></a>
+      CLICK HERE TO GET BACK YOUR DATA
+    </button>
+  </div>
+
+  <div id="llmMessagePopup" class="llm-message-popup">
+    <p id="llmMessageContent"></p>
+  </div>
+
+  <script>
+    // Global variables for Firebase (will be provided by the Canvas environment)
+    // These are placeholders and will be populated at runtime by the Canvas environment.
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    const outputContent = document.getElementById('outputContent');
+    const cursor = document.getElementById('cursor');
+    const popupOverlay = document.getElementById('popupOverlay');
+    const terminalOutputDiv = document.getElementById('terminalOutput');
+    const progressBarContainer = document.getElementById('progressBarContainer');
+    const progressBar = document.getElementById('progressBar');
+    const redFlashOverlay = document.getElementById('redFlashOverlay');
+    const llmMessagePopup = document.getElementById('llmMessagePopup');
+    const llmMessageContent = document.getElementById('llmMessageContent');
+    const body = document.body; // Reference to the body for screen shake and glitch
+    const startButton = document.getElementById('startButton'); // Get the initial start button
+    const getBackDataButton = document.getElementById('getBackDataButton'); // Get the new "Get Back Data" button
+
+    // Tone.js setup for audio
+    let backgroundDrone;
+    let glitchSound;
+
+    // Array of simulated hacking messages (shorter and scarier)
+    const messages = [
+      "WARNING: Critical system breach detected.",
+      "Firewall compromised. All defenses offline.",
+      "Accessing core system files. Your data is exposed.",
+      "Initiating data extraction: Passwords, Financials, Identity.",
+      "Data extraction complete. Your digital life is ours.",
+      "System control transferred. You are locked out.",
+      "Finalizing system wipe... Goodbye.",
+      "SYSTEM OVERRIDE. YOUR IDENTITY IS COMPROMISED."
+    ];
+
+    let messageIndex = 0;
+    let charIndex = 0;
+    let typingSpeed = 20; // Even faster typing
+    let messageDelay = 500; // Even shorter delay between messages
+
+    /**
+     * Initializes Tone.js audio elements.
+     */
+    function setupAudio() {
+      // Unsettling background drone
+      backgroundDrone = new Tone.Synth({
+        oscillator: { type: "sawtooth" },
+        envelope: {
+          attack: 0.1,
+          decay: 0.2,
+          sustain: 1,
+          release: 0.5
+        }
+      }).toDestination();
+      backgroundDrone.volume.value = -20; // Keep it subtle
+
+      // Glitch/breach sound effect
+      glitchSound = new Tone.NoiseSynth({
+        noise: { type: "pink" },
+        envelope: {
+          attack: 0.005,
+          decay: 0.1,
+          sustain: 0,
+          release: 0.05
+        }
+      }).toDestination();
+      glitchSound.volume.value = -10; // Louder for impact
+    }
+
+    /**
+     * Simulates typing out a message character by character.
+     * @param {string} message - The message to type.
+     * @returns {Promise<void>} A promise that resolves when the message is fully typed.
+     */
+    function typeMessage(message) {
+      return new Promise(resolve => {
+        charIndex = 0;
+        outputContent.innerHTML += "<br>> "; // Add a new line and prompt
+        const currentLineStart = outputContent.innerHTML.length;
+
+        const typingInterval = setInterval(() => {
+          if (charIndex < message.length) {
+            outputContent.innerHTML = outputContent.innerHTML.substring(0, currentLineStart + charIndex) + message[charIndex] + outputContent.innerHTML.substring(currentLineStart + charIndex);
+            charIndex++;
+            // Scroll to bottom
+            terminalOutputDiv.scrollTop = terminalOutputDiv.scrollHeight;
+          } else {
+            clearInterval(typingInterval);
+            resolve();
+          }
+        }, typingSpeed);
+      });
+    }
+
+    /**
+     * Updates the progress bar.
+     * @param {number} percentage - The percentage to set the progress bar to (0-100).
+     */
+    function updateProgressBar(percentage) {
+      progressBar.style.width = `${percentage}%`;
+    }
+
+    /**
+     * Adds a dynamic, flashing warning message to the screen.
+     * @param {string} text - The warning text.
+     * @param {number} duration - How long the warning should be visible in ms.
+     */
+    function addDynamicWarning(text, duration = 1500) {
+      const warningDiv = document.createElement('div');
+      warningDiv.textContent = text;
+      warningDiv.classList.add('dynamic-warning');
+
+      // Random positioning
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const randomX = Math.random() * (viewportWidth * 0.7) + (viewportWidth * 0.15); // Centerish
+      const randomY = Math.random() * (viewportHeight * 0.6) + (viewportHeight * 0.2); // Centerish
+      warningDiv.style.left = `${randomX}px`;
+      warningDiv.style.top = `${randomY}px`;
+
+      body.appendChild(warningDiv);
+
+      // Show and then remove after duration
+      setTimeout(() => {
+        warningDiv.classList.add('show');
+      }, 50); // Small delay to ensure transition works
+
+      setTimeout(() => {
+        warningDiv.classList.remove('show');
+        // Remove from DOM after fade out
+        setTimeout(() => {
+          if (warningDiv.parentNode) {
+            warningDiv.parentNode.removeChild(warningDiv);
+          }
+        }, 300); // Allow for fade-out transition
+      }, duration);
+    }
+
+    /**
+     * Triggers a subtle screen shake effect.
+     * @param {number} duration - How long the shake should last in ms.
+     */
+    function triggerScreenShake(duration = 300) {
+      body.classList.add('screen-shake');
+      setTimeout(() => {
+        body.classList.remove('screen-shake');
+      }, duration);
+    }
+
+    /**
+     * Triggers a full-screen red flash.
+     * @param {number} duration - How long the flash should last in ms.
+     */
+    function triggerRedFlash(duration = 150) {
+      redFlashOverlay.classList.add('active');
+      setTimeout(() => {
+        redFlashOverlay.classList.remove('active');
+      }, duration);
+    }
+
+    /**
+     * Triggers a visual glitch effect on the body.
+     * @param {number} duration - How long the glitch should last in ms.
+     */
+    function triggerGlitchEffect(duration = 500) {
+      body.classList.add('glitch-effect');
+      setTimeout(() => {
+        body.classList.remove('glitch-effect');
+      }, duration);
+    }
+
+    /**
+     * Uses Gemini API to generate an intercepted message.
+     */
+    async function generateInterceptedMessage() {
+      llmMessageContent.textContent = "✨ Intercepting data stream...";
+      llmMessagePopup.style.left = `${Math.random() * (window.innerWidth - llmMessagePopup.offsetWidth)}px`;
+      llmMessagePopup.style.top = `${Math.random() * (window.innerHeight - llmMessagePopup.offsetHeight)}px`;
+      llmMessagePopup.classList.add('active');
+
+      const prompt = "Generate a short, cryptic, and unsettling message (under 40 words) that appears to be an intercepted communication or a corrupted system log from a compromised computer system. Focus on themes of data breach, loss of control, and impending doom. Do not use quotes or conversational language.";
+      let chatHistory = [];
+      chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+      const payload = { contents: chatHistory };
+      const apiKey = ""; // Canvas will provide this at runtime
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+
+        if (result.candidates && result.candidates.length > 0 &&
+          result.candidates[0].content && result.candidates[0].content.parts &&
+          result.candidates[0].content.parts.length > 0) {
+          const text = result.candidates[0].content.parts[0].text;
+          llmMessageContent.textContent = "✨ INTERCEPTED: " + text;
+        } else {
+          llmMessageContent.textContent = "✨ INTERCEPTED: [DATA CORRUPTED]";
+        }
+      } catch (error) {
+        console.error("Error generating LLM message:", error);
+        llmMessageContent.textContent = "✨ INTERCEPTED: [CONNECTION LOST]";
+      }
+
+      // Make it disappear after a few seconds
+      setTimeout(() => {
+        llmMessagePopup.classList.remove('active');
+      }, 4000); // Show for 4 seconds
+    }
+
+
+    /**
+     * Simulates the hacking sequence.
+     */
+    async function startHackingSimulation() {
+      terminalOutputDiv.classList.add('active'); // Make terminal visible
+      cursor.style.display = 'inline-block'; // Show cursor
+
+      // Start background drone
+      backgroundDrone.triggerAttack("+0.1", Tone.now(), 0.5); // Start with a slight delay
+
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+
+        // Add dynamic warnings, screen shake, red flash, glitch at specific points
+        if (message.includes("Firewall compromised")) {
+          addDynamicWarning("SYSTEM INTEGRITY LOST!", 2000);
+          triggerScreenShake(400);
+          triggerRedFlash(100);
+          glitchSound.triggerAttackRelease("8n"); // Play glitch sound
+        } else if (message.includes("Accessing core system files")) {
+          addDynamicWarning("DATA EXPOSED!", 1800);
+          triggerGlitchEffect(300);
+        } else if (message.includes("Initiating data extraction")) {
+          addDynamicWarning("WARNING: DATA BREACH!", 2000);
+          triggerScreenShake(500);
+          triggerRedFlash(150);
+          glitchSound.triggerAttackRelease("8n"); // Play glitch sound
+        } else if (message.includes("System control transferred")) {
+          addDynamicWarning("CONTROL LOST!", 2200);
+          triggerScreenShake(600);
+          triggerGlitchEffect(400);
+          triggerRedFlash(200);
+        } else if (message.includes("Finalizing system wipe")) {
+          addDynamicWarning("GOODBYE.", 2500);
+          triggerScreenShake(800);
+          triggerRedFlash(250);
+          glitchSound.triggerAttackRelease("4n"); // Longer glitch sound
+        } else if (message.includes("Data extraction complete")) {
+          // Trigger LLM message after data extraction is complete
+          await generateInterceptedMessage();
+        }
+
+        await typeMessage(message);
+
+        // Simulate progress bar for specific messages
+        if (message.includes("Extraction in progress")) {
+          progressBarContainer.style.display = 'block';
+          let progress = 0;
+          const progressInterval = setInterval(() => {
+            progress += 20; // Faster progress bar
+            if (progress <= 100) {
+              updateProgressBar(progress);
+            } else {
+              clearInterval(progressInterval);
+              progressBarContainer.style.display = 'none'; // Hide after completion
+              updateProgressBar(0); // Reset for next use
+            }
+          }, 50); // Update every 50ms for even faster progress
+          await new Promise(resolve => setTimeout(() => {
+            clearInterval(progressInterval); // Ensure it stops if message finishes early
+            progressBarContainer.style.display = 'none';
+            updateProgressBar(0);
+            resolve();
+          }, 500)); // Wait for 0.5 second for progress bar to finish
+        }
+
+        await new Promise(resolve => setTimeout(resolve, messageDelay));
+      }
+      cursor.style.display = 'none'; // Hide cursor when done
+      backgroundDrone.triggerRelease(Tone.now() + 0.5); // Fade out drone
+
+      // Show the "Get Back Data" button after the simulation is complete
+      getBackDataButton.classList.add('active');
+    }
+
+    // Initial setup on window load
+    window.onload = function () {
+      console.log("App ID:", appId);
+      console.log("Firebase Config:", firebaseConfig);
+      console.log("Initial Auth Token:", initialAuthToken);
+
+      // Hide terminal output initially until popup is dismissed
+      terminalOutputDiv.classList.remove('active');
+      cursor.style.display = 'none';
+      getBackDataButton.classList.remove('active'); // Ensure button is hidden on load
+    };
+
+    // Handles the click event on the initial start button.
+    startButton.addEventListener('click', async () => {
+      // Start Tone.js context on user interaction
+      await Tone.start();
+      setupAudio(); // Initialize audio after Tone.start()
+
+      popupOverlay.classList.add('hidden');
+      setTimeout(() => {
+        popupOverlay.style.display = 'none'; // Fully remove from layout after transition
+        startHackingSimulation();
+      }, 500); // Wait for transition to complete
+    });
+
+    // Handles the click event on the "Get Back Data" button
+    getBackDataButton.addEventListener('click', () => {
+      window.location.href = "https://youtu.be/dQw4w9WgXcQ?feature=shared";
+    });
+
+
+    // Prevent right-click context menu for a more immersive experience
+    document.addEventListener('contextmenu', event => event.preventDefault());
+
+    // Custom mouse cursor: green dot
+    document.body.style.cursor = 'none'; // Hide default cursor
+    const customCursor = document.createElement('div');
+    customCursor.style.cssText = `
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            background-color: #00ff00; /* Green cursor */
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 5px #00ff00;
+        `;
+    document.body.appendChild(customCursor);
+
+    document.addEventListener('mousemove', (e) => {
+      customCursor.style.left = `${e.clientX}px`;
+      customCursor.style.top = `${e.clientY}px`;
+    });
+  </script>
+</body>
+
+</html>
